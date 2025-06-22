@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz de Medicina Universitaria</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Estilos personalizados para la fuente Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Un color de fondo suave */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Asegura que ocupe toda la altura de la ventana */
+            margin: 0;
+            padding: 20px; /* Espaciado general */
+            box-sizing: border-box;
+            /* overflow: hidden; <--- Esta línea fue eliminada para permitir el scroll */
+        }
+        .container {
+            background-color: #ffffff; /* Fondo blanco para el contenedor principal */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Sombra sutil */
+            border-radius: 1.5rem; /* Bordes más redondeados */
+            padding: 2.5rem; /* Más padding interno */
+            max-width: 600px; /* Ancho máximo para el quiz */
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem; /* Espacio entre elementos */
+            position: relative; /* Para el confeti */
+            z-index: 1; /* Asegura que el contenido esté por encima del confeti */
+        }
+        .question-container {
+            background-color: #e2e8f0; /* Fondo ligeramente gris para la pregunta */
+            padding: 1.5rem;
+            border-radius: 1rem;
+            font-size: 1.25rem; /* Tamaño de fuente más grande para la pregunta */
+            font-weight: 600; /* Semibold */
+            color: #2d3748; /* Color de texto oscuro */
+            display: flex; /* Usar flexbox para alinear contenido */
+            flex-direction: column; /* Apilar imagen y texto */
+            align-items: center; /* Centrar elementos horizontalmente */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Sombra suave para la tarjeta de pregunta */
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* Una columna por defecto */
+            gap: 1rem; /* Espacio entre opciones */
+        }
+        @media (min-width: 640px) { /* En pantallas pequeñas, 2 columnas */
+            .options-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        .option-button {
+            background-color: #cbd5e0; /* Gris claro para los botones de opción */
+            color: #4a5568; /* Texto gris oscuro */
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out; /* Transición suave */
+            border: 2px solid transparent; /* Borde transparente por defecto */
+        }
+        .option-button:hover {
+            background-color: #a0aec0; /* Gris más oscuro al pasar el ratón */
+            color: #2d3748;
+        }
+        .option-button.selected {
+            background-color: #63b3ed; /* Azul para la opción seleccionada */
+            color: white;
+            border-color: #3182ce; /* Borde azul más oscuro */
+            transform: translateY(-2px); /* Ligero levantamiento */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .option-button.correct {
+            background-color: #48bb78; /* Verde para la respuesta correcta */
+            color: white;
+            border-color: #38a169;
+        }
+        .option-button.incorrect {
+            background-color: #f56565; /* Rojo para la respuesta incorrecta */
+            color: white;
+            border-color: #e53e3e;
+        }
+        .nav-button {
+            background-color: #4299e1; /* Azul vibrante para el botón de navegación */
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.125rem; /* Tamaño de fuente más grande */
+            font-weight: 700; /* Bold */
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            border: none;
+            box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4); /* Sombra para el botón */
+        }
+        .nav-button:hover {
+            background-color: #3182ce; /* Azul más oscuro al pasar el ratón */
+            transform: translateY(-1px);
+        }
+        .nav-button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .ai-button {
+            background-color: #805ad5; /* Púrpura para los botones de IA */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            border: none;
+            box-shadow: 0 4px 10px rgba(128, 90, 213, 0.4);
+        }
+        .ai-button:hover {
+            background-color: #6b46c1;
+            transform: translateY(-1px);
+        }
+        .ai-button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .hidden {
+            display: none;
+        }
+        .results-container {
+            background-color: #edf2f7; /* Fondo claro para los resultados */
+            padding: 2rem;
+            border-radius: 1.5rem;
+            color: #2d3748;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Sombra suave para la tarjeta de resultados */
+        }
+        .results-container h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #2c5282; /* Azul oscuro para el título de resultados */
+        }
+        .results-container p {
+            margin-bottom: 0.75rem;
+        }
+        .score-text {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #38a169; /* Verde para el puntaje */
+        }
+        .explanation-container {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f7fafc;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+        .feedback-message {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .feedback-message.correct {
+            color: #2f855a; /* Verde oscuro para correcto */
+        }
+        .feedback-message.incorrect {
+            color: #c53030; /* Rojo oscuro para incorrecto */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #4299e1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Estilos para preguntas abiertas */
+        .open-ended-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e0;
+            font-size: 1rem;
+            color: #2d3748;
+            margin-top: 1rem;
+            box-sizing: border-box;
+        }
+        .open-ended-input:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+        }
+
+        /* Estilos para el confeti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f0f; /* Color base, se cambiará dinámicamente */
+            opacity: 0;
+            animation: confetti-fall 3s ease-out forwards;
+            border-radius: 50%;
+            z-index: 0; /* Detrás del contenido del quiz */
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Estilos para el contenedor de la gráfica */
+        #radar-chart-container {
+            width: 100%;
+            max-width: 400px; /* Tamaño máximo para la gráfica */
+            height: 300px;
+            margin: 1.5rem auto;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Estilos para la barra de progreso */
+        #progress-bar-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 9999px; /* Para que sea completamente redondeada */
+            height: 0.75rem; /* Altura de la barra */
+            margin-bottom: 1.5rem; /* Espacio debajo de la barra */
+            overflow: hidden; /* Asegura que el relleno no se desborde */
+        }
+
+        #progress-bar {
+            height: 100%;
+            background-color: #4299e1; /* Color de la barra de progreso */
+            width: 0%; /* Ancho inicial */
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out; /* Transición suave del ancho */
+        }
+        #progress-text {
+            font-size: 0.875rem; /* Texto más pequeño para el progreso */
+            color: #4a5568;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-4">Quiz de Medicina Universitaria</h1>
+
+        <div id="welcome-screen" class="flex flex-col items-center justify-center p-8">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">¡Bienvenido al Quiz de Medicina!</h2>
+            <p class="text-gray-600 mb-6">Demuestra tus conocimientos en diversas áreas de la medicina a nivel universitario.</p>
+            <button id="start-quiz-button" class="nav-button">Comenzar Quiz</button>
+        </div>
+
+        <div id="quiz-screen" class="hidden">
+            <div id="progress-text" class="text-sm text-gray-600 mb-2">Pregunta <span id="current-q-num">1</span> de <span id="total-q-count">15</span></div>
+            <div id="progress-bar-container">
+                <div id="progress-bar"></div>
+            </div>
+
+            <div id="question-container" class="question-container">
+                </div>
+            <div id="options-container" class="options-grid">
+                </div>
+            <div id="instant-feedback" class="feedback-message hidden"></div>
+
+            <button id="explain-answer-button" class="ai-button mt-4 hidden">✨ Explicar Respuesta</button>
+            <div id="explanation-container" class="explanation-container hidden">
+                <div id="explanation-loading" class="loading-spinner hidden"></div>
+                <p id="explanation-text"></p>
+            </div>
+            <button id="next-button" class="nav-button mt-6">Siguiente Pregunta</button>
+        </div>
+
+        <div id="results-screen" class="results-container hidden">
+            <h2 class="mb-4">¡Quiz Completado!</h2>
+            <p class="score-text mb-4">Tu puntaje: <span id="final-score">0</span> / <span id="total-questions">0</span></p>
+            <div id="radar-chart-container"></div>
+            <div id="feedback-loading" class="loading-spinner hidden mb-4"></div>
+            <p id="feedback-message" class="text-gray-700"></p>
+            <button id="restart-button" class="nav-button mt-6">Volver a Jugar</button>
+        </div>
+    </div>
+
+    <script>
+        // Array de objetos que contiene las preguntas, opciones y la respuesta correcta.
+        const questions = [
+            // Clínica (3 preguntas)
+            {
+                question: "¿Cuál es el gold standard para el diagnóstico definitivo de la tuberculosis pulmonar activa?",
+                options: ["Radiografía de tórax", "Prueba de la tuberculina (PPD)", "Cultivo de esputo para Mycobacterium tuberculosis", "PCR para Mycobacterium tuberculosis en esputo"],
+                correctAnswer: 2, // Cultivo de esputo para Mycobacterium tuberculosis
+                type: 'multiple_choice',
+                category: 'Clínica'
+            },
+            {
+                question: "La presencia de un soplo cardíaco siempre indica una patología valvular grave que requiere cirugía.",
+                type: 'true_false',
+                correctAnswer: false, // Falso (pueden ser soplos fisiológicos o benignos)
+                category: 'Clínica'
+            },
+            {
+                question: "Menciona el nombre de un signo clínico temprano y característico de la enfermedad de Parkinson.",
+                type: 'open_ended',
+                correctAnswer: ["temblor en reposo", "bradicinesia", "rigidez"], // Aceptar variaciones
+                hint: "Uno de los tres síntomas cardinales, especialmente visible cuando el paciente está quieto." ,
+                category: 'Clínica'
+            },
+            // Salud Ocupacional (3 preguntas)
+            {
+                question: "¿Cuál es la principal vía de exposición a agentes químicos en el lugar de trabajo que causa la mayoría de las intoxicaciones sistémicas?",
+                options: ["Dérmica", "Inhalatoria", "Ingestión", "Parenteral"],
+                correctAnswer: 1, // Inhalatoria
+                type: 'multiple_choice',
+                category: 'Salud Ocupacional'
+            },
+            {
+                question: "La evaluación de riesgos psicosociales en el trabajo es una parte fundamental de la salud ocupacional moderna.",
+                type: 'true_false',
+                correctAnswer: true, // Verdadero
+                category: 'Salud Ocupacional'
+            },
+            {
+                question: "Indica una enfermedad respiratoria ocupacional común causada por la inhalación de fibras de asbesto.",
+                type: 'open_ended',
+                correctAnswer: ["asbestosis", "mesotelioma"], // Aceptar variaciones
+                hint: "Está relacionada con un material de construcción antiguo y peligroso." ,
+                category: 'Salud Ocupacional'
+            },
+            // Investigación Médica (3 preguntas)
+            {
+                question: "¿Qué tipo de sesgo ocurre cuando los participantes de un estudio cambian su comportamiento al saber que están siendo observados?",
+                options: ["Sesgo de selección", "Sesgo de información", "Efecto Hawthorne", "Sesgo de publicación"],
+                correctAnswer: 2, // Efecto Hawthorne
+                type: 'multiple_choice',
+                category: 'Investigación Médica'
+            },
+            {
+                question: "Un valor de p < 0.05 en un estudio estadístico siempre significa que el efecto observado es clínicamente significativo.",
+                type: 'true_false',
+                correctAnswer: false, // Falso (significancia estadística no es igual a significancia clínica)
+                category: 'Investigación Médica'
+            },
+            {
+                question: "Menciona la fase de un ensayo clínico que evalúa la eficacia de un nuevo fármaco en un grupo grande de pacientes y lo compara con tratamientos existentes.",
+                type: 'open_ended',
+                correctAnswer: ["fase 3", "fase iii"], // Aceptar variaciones
+                hint: "Es la fase previa a la aprobación regulatoria." ,
+                category: 'Investigación Médica'
+            },
+            // Medicina Familiar y Atención Primaria (3 preguntas)
+            {
+                question: "¿Cuál es el enfoque principal de la medicina familiar en el sistema de salud?",
+                options: ["Atención especializada en órganos específicos", "Tratamiento exclusivo de enfermedades crónicas", "Atención integral y continua a individuos y familias", "Solo prevención de enfermedades infecciosas"],
+                correctAnswer: 2, // Atención integral y continua a individuos y familias
+                type: 'multiple_choice',
+                category: 'Medicina Familiar y Atención Primaria'
+            },
+            {
+                question: "La atención primaria de salud se limita al tratamiento de enfermedades agudas y no incluye la promoción de la salud o la prevención.",
+                type: 'true_false',
+                correctAnswer: false, // Falso
+                category: 'Medicina Familiar y Atención Primaria'
+            },
+            {
+                question: "Menciona un ejemplo de actividad de promoción de la salud que se realiza comúnmente en atención primaria.",
+                type: 'open_ended',
+                correctAnswer: ["educación para la salud", "campañas de vacunación", "asesoramiento nutricional", "cribado de enfermedades"], // Aceptar variaciones
+                hint: "Busca mejorar el bienestar general de la población." ,
+                category: 'Medicina Familiar y Atención Primaria'
+            },
+            // Gestión en Salud (3 preguntas)
+            {
+                question: "¿Qué concepto se refiere a la optimización de los recursos (humanos, financieros, materiales) en una institución de salud para lograr sus objetivos de manera eficiente?",
+                options: ["Auditoría médica", "Planificación estratégica", "Gestión de recursos", "Evaluación de la calidad"],
+                correctAnswer: 2, // Gestión de recursos
+                type: 'multiple_choice',
+                category: 'Gestión en Salud'
+            },
+            {
+                question: "La calidad en salud se define exclusivamente por la ausencia de errores médicos y no considera la experiencia del paciente.",
+                type: 'true_false',
+                correctAnswer: false, // Falso
+                category: 'Gestión en Salud'
+            },
+            {
+                question: "Indica un desafío común en la gestión de hospitales públicos en México.",
+                type: 'open_ended',
+                correctAnswer: ["financiamiento", "presupuesto", "infraestructura", "escasez de personal", "listas de espera", "corrupción"], // Aceptar variaciones
+                hint: "A menudo se relaciona con la disponibilidad de fondos o recursos físicos." ,
+                category: 'Gestión en Salud'
+            }
+        ];
+
+        // Variables de estado para el quiz
+        let currentQuestionIndex = 0; // Índice de la pregunta actual
+        let score = 0; // Puntaje total del usuario
+        let selectedAnswerIndex = null; // Índice de la opción seleccionada (para múltiple choice/true-false)
+        let openEndedAnswer = ''; // Almacena la respuesta para preguntas abiertas
+
+        // Definir categorías y sus puntajes iniciales
+        const categories = {
+            'Clínica': { score: 0, total: 0 },
+            'Salud Ocupacional': { score: 0, total: 0 },
+            'Investigación Médica': { score: 0, total: 0 },
+            'Medicina Familiar y Atención Primaria': { score: 0, total: 0 },
+            'Gestión en Salud': { score: 0, total: 0 }
+        };
+
+        // Obtener referencias a los elementos del DOM
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const startQuizButton = document.getElementById('start-quiz-button');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const questionContainer = document.getElementById('question-container');
+        const optionsContainer = document.getElementById('options-container');
+        const nextButton = document.getElementById('next-button');
+        const finalScoreSpan = document.getElementById('final-score');
+        const totalQuestionsSpan = document.getElementById('total-questions');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const restartButton = document.getElementById('restart-button');
+        const explainAnswerButton = document.getElementById('explain-answer-button');
+        const explanationContainer = document.getElementById('explanation-container');
+        const explanationText = document.getElementById('explanation-text');
+        const explanationLoading = document.getElementById('explanation-loading');
+        const feedbackLoading = document.getElementById('feedback-loading');
+        const instantFeedback = document.getElementById('instant-feedback'); // Elemento para feedback instantáneo
+        const radarChartContainer = document.getElementById('radar-chart-container'); // Contenedor de la gráfica
+        const progressBarContainer = document.getElementById('progress-bar-container');
+        const progressBar = document.getElementById('progress-bar');
+        const currentQNumSpan = document.getElementById('current-q-num');
+        const totalQCountSpan = document.getElementById('total-q-count');
+
+        /**
+         * Baraja un array utilizando el algoritmo Fisher-Yates (Knuth).
+         * @param {Array} array - El array a barajar.
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]]; // Intercambiar elementos
+            }
+        }
+
+        /**
+         * Inicializa el quiz mostrando la pantalla de bienvenida.
+         */
+        function initQuiz() {
+            welcomeScreen.classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultsScreen.classList.add('hidden');
+            totalQCountSpan.textContent = questions.length; // Establecer el total de preguntas
+            shuffleArray(questions); // Barajar las preguntas al inicio
+        }
+
+        /**
+         * Carga la pregunta actual en la interfaz de usuario.
+         * Actualiza el texto de la pregunta y crea los elementos de entrada/botones según el tipo de pregunta.
+         */
+        function loadQuestion() {
+            // Actualizar la barra de progreso
+            const progressPercentage = (currentQuestionIndex / questions.length) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            currentQNumSpan.textContent = currentQuestionIndex + 1; // Actualizar número de pregunta actual
+
+            // Limpiar cualquier clase de estilo de selección o resultado de la pregunta anterior
+            optionsContainer.querySelectorAll('.option-button').forEach(button => {
+                button.classList.remove('selected', 'correct', 'incorrect');
+                button.disabled = false; // Habilitar botones
+            });
+
+            // Ocultar y limpiar la explicación de la respuesta anterior
+            explanationContainer.classList.add('hidden');
+            explanationText.textContent = '';
+            explainAnswerButton.classList.add('hidden'); // Ocultar el botón de explicación
+
+            // Ocultar y limpiar el feedback instantáneo
+            instantFeedback.classList.add('hidden');
+            instantFeedback.textContent = '';
+            instantFeedback.classList.remove('correct', 'incorrect');
+
+            // Restablecer la selección del usuario para la nueva pregunta
+            selectedAnswerIndex = null;
+            openEndedAnswer = '';
+            nextButton.disabled = true; // Deshabilitar el botón "Siguiente" hasta que se seleccione una opción/responda
+
+            const currentQuestion = questions[currentQuestionIndex];
+            questionContainer.innerHTML = `<p>${currentQuestion.question}</p>`; // Establecer el texto de la pregunta
+
+            optionsContainer.innerHTML = ''; // Limpiar opciones anteriores
+
+            // Renderizar las opciones según el tipo de pregunta
+            if (currentQuestion.type === 'multiple_choice') {
+                currentQuestion.options.forEach((option, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = option;
+                    button.classList.add('option-button');
+                    button.addEventListener('click', () => handleMultipleChoiceSelect(index, button));
+                    optionsContainer.appendChild(button);
+                });
+            } else if (currentQuestion.type === 'true_false') {
+                const trueButton = document.createElement('button');
+                trueButton.textContent = "Verdadero";
+                trueButton.classList.add('option-button');
+                trueButton.addEventListener('click', () => handleTrueFalseSelect(true, trueButton));
+                optionsContainer.appendChild(trueButton);
+
+                const falseButton = document.createElement('button');
+                falseButton.textContent = "Falso";
+                falseButton.classList.add('option-button');
+                falseButton.addEventListener('click', () => handleTrueFalseSelect(false, falseButton));
+                optionsContainer.appendChild(falseButton);
+            } else if (currentQuestion.type === 'open_ended') {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = currentQuestion.hint || "Escribe tu respuesta aquí...";
+                input.classList.add('open-ended-input');
+                input.id = 'open-ended-input';
+                optionsContainer.appendChild(input);
+
+                const submitButton = document.createElement('button');
+                submitButton.textContent = "Responder";
+                submitButton.classList.add('nav-button', 'mt-4'); // Reutilizar estilos de botón de navegación
+                submitButton.addEventListener('click', handleOpenEndedSubmit);
+                optionsContainer.appendChild(submitButton);
+
+                // Habilitar el botón "Siguiente" solo después de responder
+                nextButton.disabled = true;
+            }
+
+            // Actualizar el texto del botón "Siguiente" si es la última pregunta
+            if (currentQuestionIndex === questions.length - 1) {
+                nextButton.textContent = 'Ver Resultados';
+            } else {
+                nextButton.textContent = 'Siguiente Pregunta';
+            }
+        }
+
+        /**
+         * Maneja la selección de una respuesta para preguntas de opción múltiple.
+         * @param {number} index - El índice de la opción seleccionada.
+         * @param {HTMLElement} clickedButton - El botón HTML que fue clickeado.
+         */
+        function handleMultipleChoiceSelect(index, clickedButton) {
+            // Remover la clase 'selected' de cualquier botón previamente seleccionado
+            optionsContainer.querySelectorAll('.option-button').forEach(button => {
+                button.classList.remove('selected');
+            });
+
+            // Añadir la clase 'selected' al botón clickeado
+            clickedButton.classList.add('selected');
+            selectedAnswerIndex = index; // Almacenar el índice de la respuesta seleccionada
+            nextButton.disabled = false; // Habilitar el botón "Siguiente"
+
+            showInstantFeedback();
+        }
+
+        /**
+         * Maneja la selección de una respuesta para preguntas de verdadero/falso.
+         * @param {boolean} value - true si es Verdadero, false si es Falso.
+         * @param {HTMLElement} clickedButton - El botón HTML que fue clickeado.
+         */
+        function handleTrueFalseSelect(value, clickedButton) {
+            optionsContainer.querySelectorAll('.option-button').forEach(button => {
+                button.classList.remove('selected');
+            });
+            clickedButton.classList.add('selected');
+            selectedAnswerIndex = value; // Almacenar el valor booleano
+            nextButton.disabled = false;
+
+            showInstantFeedback();
+        }
+
+        /**
+         * Maneja el envío de la respuesta para preguntas abiertas.
+         */
+        function handleOpenEndedSubmit() {
+            const inputElement = document.getElementById('open-ended-input');
+            openEndedAnswer = inputElement.value.trim().toLowerCase(); // Normalizar la respuesta
+            nextButton.disabled = false; // Habilitar el botón "Siguiente"
+
+            showInstantFeedback();
+        }
+
+        /**
+         * Muestra un mensaje de feedback instantáneo (Correcto/Incorrecto)
+         * y aplica el estilo visual correspondiente.
+         */
+        function showInstantFeedback() {
+            const currentQuestion = questions[currentQuestionIndex];
+            instantFeedback.classList.remove('hidden', 'correct', 'incorrect'); // Limpiar clases anteriores
+
+            let isCorrect = false;
+
+            if (currentQuestion.type === 'multiple_choice' || currentQuestion.type === 'true_false') {
+                isCorrect = (selectedAnswerIndex === currentQuestion.correctAnswer);
+            } else if (currentQuestion.type === 'open_ended') {
+                // Para preguntas abiertas, verificar si la respuesta está en el array de respuestas correctas
+                isCorrect = currentQuestion.correctAnswer.includes(openEndedAnswer);
+            }
+
+            // Actualizar el puntaje total y el puntaje por categoría
+            if (isCorrect) {
+                instantFeedback.textContent = "¡Correcto!";
+                instantFeedback.classList.add('correct');
+                score++;
+                categories[currentQuestion.category].score++;
+            } else {
+                instantFeedback.textContent = "¡Incorrecto!";
+                instantFeedback.classList.add('incorrect');
+            }
+            categories[currentQuestion.category].total++; // Siempre incrementa el total de preguntas en la categoría
+
+            // Deshabilitar todos los controles de entrada (botones u input) después de la selección
+            if (currentQuestion.type === 'multiple_choice' || currentQuestion.type === 'true_false') {
+                optionsContainer.querySelectorAll('.option-button').forEach(button => button.disabled = true);
+                // Resaltar la respuesta correcta e incorrecta (si aplica)
+                optionsContainer.querySelectorAll('.option-button').forEach((button, index) => {
+                    if (currentQuestion.type === 'multiple_choice' && index === currentQuestion.correctAnswer) {
+                        button.classList.add('correct');
+                    } else if (currentQuestion.type === 'true_false' && (index === 0 && currentQuestion.correctAnswer === true || index === 1 && currentQuestion.correctAnswer === false)) {
+                        button.classList.add('correct');
+                    } else if ((currentQuestion.type === 'multiple_choice' && index === selectedAnswerIndex) || (currentQuestion.type === 'true_false' && ((index === 0 && selectedAnswerIndex === false) || (index === 1 && selectedAnswerIndex === true)))) {
+                        button.classList.add('incorrect');
+                    }
+                });
+            } else if (currentQuestion.type === 'open_ended') {
+                document.getElementById('open-ended-input').disabled = true;
+                optionsContainer.querySelector('.nav-button').disabled = true; // Deshabilitar el botón "Responder"
+            }
+
+            // Mostrar el botón de explicación después de que el usuario responda
+            explainAnswerButton.classList.remove('hidden');
+        }
+
+
+        /**
+         * Procesa la respuesta del usuario, actualiza el puntaje y avanza a la siguiente pregunta
+         * o muestra los resultados finales.
+         */
+        function nextQuestionHandler() {
+            currentQuestionIndex++; // Mover al siguiente índice de pregunta
+
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion(); // Cargar la siguiente pregunta
+            } else {
+                showResults(); // Mostrar la pantalla de resultados
+            }
+        }
+
+        /**
+         * Llama a la API de Gemini para obtener una explicación de la respuesta correcta.
+         */
+        async function explainAnswer() {
+            explanationContainer.classList.remove('hidden');
+            explanationText.textContent = ''; // Limpiar texto anterior
+            explanationLoading.classList.remove('hidden'); // Mostrar spinner de carga
+
+            const currentQuestion = questions[currentQuestionIndex];
+            let correctInfo = '';
+
+            if (currentQuestion.type === 'multiple_choice') {
+                correctInfo = currentQuestion.options[currentQuestion.correctAnswer];
+            } else if (currentQuestion.type === 'true_false') {
+                correctInfo = currentQuestion.correctAnswer ? "Verdadero" : "Falso";
+            } else if (currentQuestion.type === 'open_ended') {
+                correctInfo = currentQuestion.correctAnswer.join(" o "); // Mostrar todas las respuestas válidas
+            }
+
+            // Prompt ajustado para una explicación más corta y concisa
+            const prompt = `Eres un tutor amigable y educativo con conocimientos de medicina. Sé muy conciso y breve. Explica la respuesta correcta a la siguiente pregunta de medicina de la categoría "${currentQuestion.category}" para estudiantes universitarios. Pregunta: "${currentQuestion.question}". Respuesta correcta: "${correctInfo}".`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // La clave API será proporcionada por el entorno de Canvas
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    explanationText.textContent = text;
+                } else {
+                    explanationText.textContent = "No se pudo obtener la explicación. Inténtalo de nuevo.";
+                }
+            } catch (error) {
+                console.error("Error al obtener la explicación de Gemini:", error);
+                explanationText.textContent = "Error al conectar con la IA. Por favor, verifica tu conexión.";
+            } finally {
+                explanationLoading.classList.add('hidden'); // Ocultar spinner de carga
+            }
+        }
+
+        /**
+         * Dibuja una gráfica de radar (pentágono) mostrando el rendimiento por categoría.
+         * @param {object} categoryData - Objeto con los puntajes y totales por categoría.
+         */
+        function drawRadarChart(categoryData) {
+            const svgContainer = document.getElementById('radar-chart-container');
+            svgContainer.innerHTML = ''; // Limpiar gráfica anterior si existe
+
+            const width = svgContainer.clientWidth;
+            const height = svgContainer.clientHeight;
+            const radius = Math.min(width, height) / 2 * 0.7; // Radio del gráfico
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            const svg = d3.select(svgContainer)
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const numAxes = Object.keys(categoryData).length;
+            const angleSlice = Math.PI * 2 / numAxes;
+
+            // Escala para cada eje (0 a 1 para porcentaje)
+            const rScale = d3.scaleLinear()
+                .range([0, radius])
+                .domain([0, 1]); // El dominio es de 0 a 1 (0% a 100%)
+
+            // Función auxiliar para calcular los puntos del polígono
+            function getPathCoordinates(value, index, totalAxes) {
+                const angle = angleSlice * index - Math.PI / 2; // Iniciar desde arriba
+                const x = centerX + rScale(value) * Math.cos(angle);
+                const y = centerY + rScale(value) * Math.sin(angle);
+                return { x: x, y: y };
+            }
+
+            // Dibujar los círculos de fondo (rejilla)
+            const levels = 5; // Número de círculos concéntricos
+            const levelFactor = radius / levels;
+            for (let i = 0; i < levels; i++) {
+                svg.append("circle")
+                    .attr("cx", centerX)
+                    .attr("cy", centerY)
+                    .attr("r", levelFactor * (i + 1))
+                    .style("fill", "none")
+                    .style("stroke", "#ccc")
+                    .style("stroke-width", "0.5px");
+            }
+
+            // Dibujar los ejes y las etiquetas
+            Object.keys(categoryData).forEach((category, i) => {
+                const coordinate = getPathCoordinates(1, i, numAxes); // Punto en el radio máximo
+                svg.append("line")
+                    .attr("x1", centerX)
+                    .attr("y1", centerY)
+                    .attr("x2", coordinate.x)
+                    .attr("y2", coordinate.y)
+                    .style("stroke", "#ccc")
+                    .style("stroke-width", "1px");
+
+                // Añadir etiquetas de los ejes
+                svg.append("text")
+                    .attr("x", coordinate.x)
+                    .attr("y", coordinate.y)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", (coordinate.x > centerX + 5 ? "start" : (coordinate.x < centerX - 5 ? "end" : "middle"))) // Ajustar anclaje
+                    .text(category)
+                    .style("font-size", "0.8rem")
+                    .style("fill", "#4a5568")
+                    .attr("transform", `translate(${coordinate.x > centerX ? 10 : -10}, ${coordinate.y > centerY ? 10 : -10})`); // Ajuste para evitar superposición
+            });
+
+            // Dibujar el polígono de datos (área rellena)
+            const radarLine = d3.line()
+                .x(d => d.x)
+                .y(d => d.y);
+
+            const dataPoints = Object.keys(categoryData).map((category, i) => {
+                const percentage = categoryData[category].total > 0 ? categoryData[category].score / categoryData[category].total : 0;
+                return getPathCoordinates(percentage, i, numAxes);
+            });
+
+            svg.append("path")
+                .datum(dataPoints.concat([dataPoints[0]])) // Cerrar el polígono
+                .attr("d", radarLine)
+                .style("fill", "rgba(66, 153, 225, 0.6)") // Relleno azul con transparencia
+                .style("stroke", "#4299e1") // Borde azul
+                .style("stroke-width", "2px")
+                .style("opacity", 0.8);
+        }
+
+
+        /**
+         * Muestra la pantalla de resultados con el puntaje final y una retroalimentación personalizada.
+         */
+        async function showResults() {
+            quizScreen.classList.add('hidden'); // Ocultar la pantalla del quiz
+            resultsScreen.classList.remove('hidden'); // Mostrar la pantalla de resultados
+
+            finalScoreSpan.textContent = score; // Mostrar el puntaje obtenido
+            totalQuestionsSpan.textContent = questions.length; // Mostrar el total de preguntas
+            feedbackMessage.textContent = ''; // Limpiar mensaje anterior
+            feedbackLoading.classList.remove('hidden'); // Mostrar spinner de carga
+
+            // Calcular los puntajes finales por categoría para la gráfica
+            const finalCategoryScores = {};
+            for (const cat in categories) {
+                finalCategoryScores[cat] = {
+                    score: categories[cat].score,
+                    total: categories[cat].total
+                };
+            }
+            drawRadarChart(finalCategoryScores); // Dibujar la gráfica de radar
+
+            // Generar retroalimentación personalizada usando Gemini
+            const prompt = `Eres un mentor motivador para estudiantes de medicina. Basado en un quiz de medicina a nivel universitario donde el estudiante obtuvo ${score} de ${questions.length} preguntas, genera un mensaje de retroalimentación conciso y de alto valor. El mensaje debe ser alentador, reconocer el esfuerzo, y motivar a seguir aprendiendo y profundizando en sus estudios de medicina, independientemente del puntaje. Si el puntaje es alto, felicita su profundo conocimiento y dedicación. Si es bajo, enfócate en el aprendizaje continuo, la curiosidad y la importancia de la práctica en el campo de la medicina. Mantén un tono positivo y constructivo.`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = ""; // La clave API será proporcionada por el entorno de Canvas
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    feedbackMessage.textContent = text;
+                } else {
+                    feedbackMessage.textContent = "No se pudo generar la retroalimentación. ¡Gracias por participar!";
+                }
+            } catch (error) {
+                console.error("Error al obtener la retroalimentación de Gemini:", error);
+                feedbackMessage.textContent = "Error al conectar con la IA para la retroalimentación. ¡Gracias por participar!";
+            } finally {
+                feedbackLoading.classList.add('hidden'); // Ocultar spinner de carga
+            }
+
+            // Activar animación de confeti si el puntaje es alto
+            if (score >= 8) {
+                triggerConfetti();
+            }
+        }
+
+        /**
+         * Reinicia el quiz a su estado inicial para que el usuario pueda volver a jugar.
+         */
+        function resetQuiz() {
+            currentQuestionIndex = 0; // Reiniciar el índice de la pregunta
+            score = 0; // Reiniciar el puntaje total
+            selectedAnswerIndex = null; // Reiniciar la selección de respuesta
+            openEndedAnswer = ''; // Reiniciar respuesta abierta
+
+            // Reiniciar los puntajes por categoría
+            for (const cat in categories) {
+                categories[cat].score = 0;
+                categories[cat].total = 0;
+            }
+
+            welcomeScreen.classList.remove('hidden'); // Mostrar la pantalla de bienvenida
+            quizScreen.classList.add('hidden'); // Ocultar la pantalla del quiz
+            resultsScreen.classList.add('hidden'); // Ocultar la pantalla de resultados
+            explanationContainer.classList.add('hidden'); // Ocultar explicación
+            explanationText.textContent = ''; // Limpiar texto de explicación
+            explainAnswerButton.classList.add('hidden'); // Ocultar botón de explicación
+            instantFeedback.classList.add('hidden'); // Ocultar feedback instantáneo
+            instantFeedback.textContent = '';
+            instantFeedback.classList.remove('correct', 'incorrect');
+            // Limpiar cualquier confeti restante
+            document.querySelectorAll('.confetti').forEach(c => c.remove());
+            // Limpiar la gráfica de radar
+            radarChartContainer.innerHTML = '';
+            // No cargar la primera pregunta aquí, se hará al hacer clic en "Comenzar Quiz"
+            totalQCountSpan.textContent = questions.length; // Asegurar que el total de preguntas esté actualizado
+            progressBar.style.width = `0%`; // Resetear barra de progreso
+            currentQNumSpan.textContent = 1; // Resetear número de pregunta
+            shuffleArray(questions); // Volver a barajar las preguntas al reiniciar
+        }
+
+        /**
+         * Genera una animación de confeti.
+         */
+        function triggerConfetti() {
+            const colors = ['#f0f', '#0ff', '#ff0', '#f00', '#0f0', '#00f'];
+            const numConfetti = 50; // Número de piezas de confeti
+
+            for (let i = 0; i < numConfetti; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.left = Math.random() * 100 + 'vw'; // Posición aleatoria en el ancho
+                confetti.style.top = -20 + 'px'; // Empieza fuera de la pantalla
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 2 + 's'; // Retraso aleatorio
+                confetti.style.animationDuration = (2 + Math.random() * 2) + 's'; // Duración aleatoria
+                document.body.appendChild(confetti);
+
+                // Eliminar el confeti después de que termine la animación para no acumular elementos
+                confetti.addEventListener('animationend', () => {
+                    confetti.remove();
+                });
+            }
+        }
+
+
+        // Asignar eventos a los botones principales
+        startQuizButton.addEventListener('click', () => {
+            welcomeScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            loadQuestion(); // Cargar la primera pregunta al iniciar el quiz
+        });
+        nextButton.addEventListener('click', nextQuestionHandler);
+        restartButton.addEventListener('click', resetQuiz);
+        explainAnswerButton.addEventListener('click', explainAnswer); // Evento para el botón de explicación
+
+        // Inicializar la aplicación al cargar la página
+        initQuiz();
+    </script>
+</body>
+</html>
